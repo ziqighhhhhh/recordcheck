@@ -222,6 +222,13 @@
       const score = result.NBest?.[0]?.PronunciationAssessment?.PronScore || 0;
       $('drillStatus').textContent = `得分 ${score}；${score >= 80 ? '通过' : '再试一次'}`;
     };
+    $('playTtsBtn').onclick = () => {
+      const target = drillQueue[drillIndex];
+      const u = new SpeechSynthesisUtterance(target);
+      u.lang = 'en-US';
+      u.rate = 0.9;
+      speechSynthesis.speak(u);
+    };
     $('nextDrillBtn').onclick = () => { drillIndex++; if (drillIndex >= drillQueue.length) drillIndex = 0; runDrill(); };
     $('backBtn').onclick = () => { $('drill').style.display = 'none'; $('results').style.display = 'block'; };
   </script>
