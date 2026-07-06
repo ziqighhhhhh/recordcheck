@@ -38,6 +38,14 @@
     <button id="drillWordBtn">练习问题词</button>
     <button id="retryFullBtn">重新读全文</button>
   </div>
+  <div class="section" id="drill" style="display:none">
+    <p id="drillTarget" style="font-size:1.2rem;padding:1rem;background:#fff7ed;border-left:4px solid #f97316"></p>
+    <button id="playTtsBtn">🔊 听标准发音</button>
+    <button id="drillRecordBtn">🎙️ 我读</button>
+    <button id="nextDrillBtn">下一个</button>
+    <button id="backBtn">返回结果</button>
+    <p id="drillStatus"></p>
+  </div>
   <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
   <script>
     // ponytail: 单文件应用，所有逻辑放这里
@@ -107,6 +115,7 @@
       return '#fecaca';                           // red
     }
     function renderResults(aligned, overall) {
+      window.lastAligned = aligned;
       $('recording').style.display = 'none';
       $('results').style.display = 'block';
       $('scores').innerHTML = `
@@ -119,6 +128,36 @@
         const bg = scoreToColor(t.score, t.status);
         return `<span style="background:${bg};padding:2px 4px;border-radius:4px;cursor:pointer" data-idx="${t.index}">${t.raw}</span>`;
       }).join(' ');
+    }
+    function splitSentences(text) {
+      // ponytail: 简单保护 U.S. 类缩写，不做完美 NLP
+      return text.replace(/(Mr|Mrs|Ms|Dr|U\.S|e\.g|i\.e)\.\s+/g, '$1##DOT## ')
+        .split(/[.!?]+\s+/)
+        .map(s => s.replace(/##DOT##/g, '.').trim())
+        .filter(Boolean);
+    }
+    let drillQueue = [];
+    let drillIndex = 0;
+    function buildDrillQueue(aligned, mode) {
+      if (mode === 'word') {
+        drillQueue = aligned.filter(t => t.status !== 'ok' || t.score < 80).map(t => t.raw);
+      } else {
+        const badIndices = new Set(aligned.filter(t => t.status !== 'ok' || t.score < 80).map(t => t.index));
+        const sents = splitSentences($('sourceText').value);
+        drillQueue = sents.filter((s, i) => {
+          const words = tokenize(s);
+          return words.some(w => badIndices.has(w.index + aligned.filter(a => a.index < 0).length));
+        });
+      }
+      drillIndex = 0;
+    }
+    async function runDrill() {
+      if (drillQueue.length === 0) { alert('没有需要练习的内容'); return; }
+      $('results').style.display = 'none';
+      $('drill').style.display = 'block';
+      const target = drillQueue[drillIndex];
+      $('drillTarget').textContent = target;
+      $('drillStatus').textContent = `第 ${drillIndex + 1}/${drillQueue.length} 个`;
     }
 
     async function assessPronunciation(text, key, region) {
@@ -173,6 +212,18 @@
       clearInterval(recInterval);
       console.log('stopped');
     };
+    $('drillSentenceBtn').onclick = () => { buildDrillQueue(window.lastAligned, 'sentence'); runDrill(); };
+    $('drillWordBtn').onclick = () => { buildDrillQueue(window.lastAligned, 'word'); runDrill(); };
+    $('drillRecordBtn').onclick = async () => {
+      const target = drillQueue[drillIndex];
+      const region = $('region').value.trim();
+      const key = $('key').value.trim();
+      const result = await assessPronunciation(target, key, region);
+      const score = result.NBest?.[0]?.PronunciationAssessment?.PronScore || 0;
+      $('drillStatus').textContent = `得分 ${score}；${score >= 80 ? '通过' : '再试一次'}`;
+    };
+    $('nextDrillBtn').onclick = () => { drillIndex++; if (drillIndex >= drillQueue.length) drillIndex = 0; runDrill(); };
+    $('backBtn').onclick = () => { $('drill').style.display = 'none'; $('results').style.display = 'block'; };
   </script>
 </body>
 </html>
