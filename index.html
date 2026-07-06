@@ -16,11 +16,35 @@
 </head>
 <body>
   <h1>英语朗读练习</h1>
-  <div id="app"></div>
+  <div class="section" id="setup">
+    <label>Azure Region</label>
+    <input id="region" type="text" placeholder="westus2" value="westus2">
+    <label>Azure Subscription Key</label>
+    <input id="key" type="password" placeholder="输入你的 Azure Speech Key">
+    <label>英文原文</label>
+    <textarea id="sourceText" placeholder="在此粘贴英文原文..."></textarea>
+    <button id="startBtn">开始朗读评估</button>
+    <button id="demoBtn">用示例文本试试</button>
+  </div>
   <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
   <script>
     // ponytail: 单文件应用，所有逻辑放这里
     console.log('SpeechSDK:', typeof SpeechSDK);
+
+    const $ = id => document.getElementById(id);
+    $('demoBtn').onclick = () => {
+      $('sourceText').value = "I've always wanted to build a one-person business.";
+    };
+    $('startBtn').onclick = () => {
+      const region = $('region').value.trim();
+      const key = $('key').value.trim();
+      const text = $('sourceText').value.trim();
+      if (!region || !key || !text) {
+        alert('请填写 Region、Key 和原文');
+        return;
+      }
+      console.log('ready', { region, textLength: text.length });
+    };
   </script>
 </body>
 </html>
