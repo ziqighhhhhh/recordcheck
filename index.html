@@ -27,6 +27,7 @@
     <textarea id="sourceText" placeholder="在此粘贴英文原文..."></textarea>
     <button id="startBtn">开始朗读评估</button>
     <button id="demoBtn">用示例文本试试</button>
+    <button id="mockBtn">用模拟数据看效果</button>
   </div>
   <div class="section" id="recording" style="display:none">
     <p id="recText"></p>
@@ -56,6 +57,23 @@
     const $ = id => document.getElementById(id);
     $('demoBtn').onclick = () => {
       $('sourceText').value = "I've always wanted to build a one-person business.";
+    };
+    $('mockBtn').onclick = () => {
+      const text = $('sourceText').value.trim() || "I've always wanted to build a one-person business.";
+      const sourceTokens = tokenize(text);
+      const mockResult = {
+        NBest: [{
+          PronunciationAssessment: { PronScore: 82, AccuracyScore: 85, FluencyScore: 78, ProsodyScore: 80 },
+          Words: sourceTokens.map((t, i) => ({
+            Word: t.raw,
+            PronunciationAssessment: { AccuracyScore: i === 3 ? 45 : (i === 5 ? 70 : 88) }
+          }))
+        }]
+      };
+      const words = getRecoWords(mockResult);
+      const aligned = align(sourceTokens, words);
+      window.lastAligned = aligned;
+      renderResults(aligned, mockResult.NBest[0].PronunciationAssessment);
     };
 
     let recInterval;
