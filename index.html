@@ -26,6 +26,11 @@
     <button id="startBtn">开始朗读评估</button>
     <button id="demoBtn">用示例文本试试</button>
   </div>
+  <div class="section" id="recording" style="display:none">
+    <p id="recText"></p>
+    <p>录音时长：<span id="recTimer">0.0</span>s</p>
+    <button id="stopBtn">停止录音</button>
+  </div>
   <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
   <script>
     // ponytail: 单文件应用，所有逻辑放这里
@@ -35,15 +40,26 @@
     $('demoBtn').onclick = () => {
       $('sourceText').value = "I've always wanted to build a one-person business.";
     };
+
+    let recInterval;
+    function showRecording(text) {
+      $('setup').style.display = 'none';
+      $('recording').style.display = 'block';
+      $('recText').textContent = text;
+      $('recTimer').textContent = '0.0';
+      const start = Date.now();
+      recInterval = setInterval(() => {
+        $('recTimer').textContent = ((Date.now() - start) / 1000).toFixed(1);
+      }, 100);
+    }
     $('startBtn').onclick = () => {
-      const region = $('region').value.trim();
-      const key = $('key').value.trim();
       const text = $('sourceText').value.trim();
-      if (!region || !key || !text) {
-        alert('请填写 Region、Key 和原文');
-        return;
-      }
-      console.log('ready', { region, textLength: text.length });
+      if (!text) { alert('请输入原文'); return; }
+      showRecording(text);
+    };
+    $('stopBtn').onclick = () => {
+      clearInterval(recInterval);
+      console.log('stopped');
     };
   </script>
 </body>
