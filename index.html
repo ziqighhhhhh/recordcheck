@@ -153,11 +153,17 @@
       }).join(' ');
     }
     function splitSentences(text) {
-      // ponytail: 简单保护 U.S. 类缩写，不做完美 NLP
-      return text.replace(/(Mr|Mrs|Ms|Dr|U\.S|e\.g|i\.e)\.\s+/g, '$1##DOT## ')
-        .split(/[.!?]+\s+/)
-        .map(s => s.replace(/##DOT##/g, '.').trim())
-        .filter(Boolean);
+      // ponytail: 简单保护 U.S. 类缩写，不做完美 NLP；同时记录每句在全文中的词起始偏移
+      const protectedText = text.replace(/(Mr|Mrs|Ms|Dr|U\.S|e\.g|i\.e)\.\s+/g, '$1##DOT## ');
+      const rawSents = protectedText.split(/[.!?]+\s+/);
+      let offset = 0;
+      return rawSents.map(s => {
+        const clean = s.replace(/##DOT##/g, '.').trim();
+        const start = offset;
+        const wordCount = clean.split(/\s+/).filter(Boolean).length;
+        offset += wordCount;
+        return { text: clean, start };
+      }).filter(s => s.text);
     }
     let drillQueue = [];
     let drillIndex = 0;
@@ -167,10 +173,13 @@
       } else {
         const badIndices = new Set(aligned.filter(t => t.status !== 'ok' || t.score < 80).map(t => t.index));
         const sents = splitSentences($('sourceText').value);
-        drillQueue = sents.filter((s, i) => {
-          const words = tokenize(s);
-          return words.some(w => badIndices.has(w.index + aligned.filter(a => a.index < 0).length));
-        });
+        drillQueue = sents.filter(s => {
+          const wordCount = s.text.split(/\s+/).filter(Boolean).length;
+          for (let i = s.start; i < s.start + wordCount; i++) {
+            if (badIndices.has(i)) return true;
+          }
+          return false;
+        }).map(s => s.text);
       }
       drillIndex = 0;
     }
