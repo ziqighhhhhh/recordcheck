@@ -52,6 +52,47 @@
         $('recTimer').textContent = ((Date.now() - start) / 1000).toFixed(1);
       }, 100);
     }
+    function normalizeWord(w) {
+      return w.toLowerCase()
+        .replace(/[.,!?;:"'()\[\]]/g, '')
+        .replace(/’/g, "'")
+        .replace(/i'm/g, 'im')
+        .replace(/i've/g, 'ive')
+        .replace(/i'll/g, 'ill')
+        .replace(/don't/g, 'dont')
+        .replace(/can't/g, 'cant')
+        .trim();
+    }
+    function tokenize(text) {
+      return text.split(/\s+/).filter(Boolean).map((w, i) => ({ raw: w, norm: normalizeWord(w), index: i }));
+    }
+    function align(sourceTokens, recoWords) {
+      const out = sourceTokens.map(t => ({ ...t, status: 'missing', score: 0, recognized: null }));
+      let s = 0;
+      for (const rw of recoWords) {
+        const rn = normalizeWord(rw.Word || rw.word || '');
+        if (!rn) continue;
+        // 找到下一个匹配的原文词
+        let matched = -1;
+        for (let i = s; i < out.length; i++) {
+          if (out[i].status === 'missing' && out[i].norm === rn) { matched = i; break; }
+        }
+        if (matched >= 0) {
+          out[matched].status = 'ok';
+          out[matched].score = (rw.PronunciationAssessment?.AccuracyScore) || 80;
+          out[matched].recognized = rw.Word;
+          s = matched + 1;
+        } else {
+          out.push({ raw: rw.Word, norm: rn, index: -1, status: 'extra', score: 0, recognized: rw.Word });
+        }
+      }
+      return out;
+    }
+    function getRecoWords(result) {
+      const nbest = result.NBest?.[0];
+      return nbest?.Words || [];
+    }
+
     async function assessPronunciation(text, key, region) {
       const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(key, region);
       speechConfig.speechRecognitionLanguage = 'en-US';
@@ -88,7 +129,10 @@
       showRecording(text);
       try {
         const result = await assessPronunciation(text, key, region);
-        console.log('result', result);
+        const words = getRecoWords(result);
+        const sourceTokens = tokenize(text);
+        const aligned = align(sourceTokens, words);
+        console.table(aligned);
         clearInterval(recInterval);
       } catch (e) {
         clearInterval(recInterval);
