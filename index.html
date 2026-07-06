@@ -114,6 +114,9 @@
       if (score >= 60) return '#fef08a';          // yellow
       return '#fecaca';                           // red
     }
+    function showError(msg) {
+      alert(msg); // ponytail: 先用 alert，后续可换成页面内提示
+    }
     function renderResults(aligned, overall) {
       window.lastAligned = aligned;
       $('recording').style.display = 'none';
@@ -205,7 +208,12 @@
         clearInterval(recInterval);
       } catch (e) {
         clearInterval(recInterval);
-        alert(e.message);
+        const msg = e.message || '';
+        if (msg.includes('401') || msg.includes('403')) showError('Azure Key 或 Region 无效，请检查 Azure 门户');
+        else if (msg.includes('network') || msg.includes('ECONNREFUSED')) showError('连接 Azure 失败，请检查网络');
+        else if (msg.includes('NotAllowed')) showError('麦克风权限被拒绝，请在浏览器设置中允许');
+        else if (msg.includes('识别失败')) showError('未检测到语音，请靠近麦克风再试一次');
+        else showError('出错了：' + msg);
       }
     };
     $('stopBtn').onclick = () => {
