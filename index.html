@@ -2,16 +2,18 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>英语朗读练习</title>
   <style>
     /* ponytail: 最小样式，先保证可用再美化 */
-    body { font-family: system-ui, -apple-system, sans-serif; margin: 1rem; line-height: 1.6; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 1rem; line-height: 1.6; background: #fff; color: #111; }
     .section { margin-bottom: 1.5rem; }
     label { display: block; margin-top: 0.5rem; font-size: 0.9rem; }
     input, textarea, button { font-size: 1rem; padding: 0.5rem; width: 100%; box-sizing: border-box; }
     textarea { min-height: 120px; }
-    button { margin-top: 0.5rem; }
+    button { margin-top: 0.5rem; min-height: 44px; touch-action: manipulation; }
+    #highlighted span { display: inline-block; margin: 2px; }
+    #drillTarget { word-break: break-word; }
   </style>
 </head>
 <body>
