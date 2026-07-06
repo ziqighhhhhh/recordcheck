@@ -195,12 +195,12 @@
     async function assessPronunciation(text, key, region) {
       const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(key, region);
       speechConfig.speechRecognitionLanguage = 'en-US';
-      const pronunciationConfig = SpeechSDK.PronunciationAssessmentConfig.fromJson(JSON.stringify({
-        referenceText: text,
-        gradingSystem: SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
-        granularity: SpeechSDK.PronunciationAssessmentGranularity.Phoneme,
-        enableMiscue: true
-      }));
+      const pronunciationConfig = new SpeechSDK.PronunciationAssessmentConfig(
+        text,
+        SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
+        SpeechSDK.PronunciationAssessmentGranularity.Phoneme,
+        true
+      );
       const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
       const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
       pronunciationConfig.applyTo(recognizer);
