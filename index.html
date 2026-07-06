@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>英语朗读练习</title>
+  <style>
+    /* ponytail: 最小样式，先保证可用再美化 */
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 1rem; line-height: 1.6; }
+    .section { margin-bottom: 1.5rem; }
+    label { display: block; margin-top: 0.5rem; font-size: 0.9rem; }
+    input, textarea, button { font-size: 1rem; padding: 0.5rem; width: 100%; box-sizing: border-box; }
+    textarea { min-height: 120px; }
+    button { margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>英语朗读练习</h1>
+  <div id="app"></div>
+  <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+  <script>
+    // ponytail: 单文件应用，所有逻辑放这里
+    console.log('SpeechSDK:', typeof SpeechSDK);
+  </script>
+</body>
+</html>
