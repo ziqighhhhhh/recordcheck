@@ -31,6 +31,13 @@
     <p>录音时长：<span id="recTimer">0.0</span>s</p>
     <button id="stopBtn">停止录音</button>
   </div>
+  <div class="section" id="results" style="display:none">
+    <div id="scores"></div>
+    <div id="highlighted" style="line-height:2; font-size:1.1rem;"></div>
+    <button id="drillSentenceBtn">练习问题句</button>
+    <button id="drillWordBtn">练习问题词</button>
+    <button id="retryFullBtn">重新读全文</button>
+  </div>
   <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
   <script>
     // ponytail: 单文件应用，所有逻辑放这里
@@ -92,6 +99,27 @@
       const nbest = result.NBest?.[0];
       return nbest?.Words || [];
     }
+    function scoreToColor(score, status) {
+      if (status === 'missing') return '#fecaca'; // red
+      if (status === 'extra') return '#fef08a';   // yellow
+      if (score >= 80) return '#bbf7d0';          // green
+      if (score >= 60) return '#fef08a';          // yellow
+      return '#fecaca';                           // red
+    }
+    function renderResults(aligned, overall) {
+      $('recording').style.display = 'none';
+      $('results').style.display = 'block';
+      $('scores').innerHTML = `
+        <strong>总体 ${overall.PronScore}</strong> |
+        准确度 ${overall.AccuracyScore} |
+        流畅度 ${overall.FluencyScore} |
+        语调 ${overall.ProsodyScore}
+      `;
+      $('highlighted').innerHTML = aligned.map(t => {
+        const bg = scoreToColor(t.score, t.status);
+        return `<span style="background:${bg};padding:2px 4px;border-radius:4px;cursor:pointer" data-idx="${t.index}">${t.raw}</span>`;
+      }).join(' ');
+    }
 
     async function assessPronunciation(text, key, region) {
       const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(key, region);
@@ -133,6 +161,8 @@
         const sourceTokens = tokenize(text);
         const aligned = align(sourceTokens, words);
         console.table(aligned);
+        const nbest = result.NBest?.[0];
+        renderResults(aligned, nbest.PronunciationAssessment);
         clearInterval(recInterval);
       } catch (e) {
         clearInterval(recInterval);
