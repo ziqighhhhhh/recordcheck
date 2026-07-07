@@ -67,21 +67,23 @@
       const text = $('sourceText').value.trim() || "I've always wanted to build a one-person business.";
       const sourceTokens = tokenize(text);
       const mid = Math.ceil(sourceTokens.length / 2);
-      const makeWords = (tokens, offset) => tokens.map((t, i) => ({
+      const makeWords = (tokens, offset, timeOffset) => tokens.map((t, i) => ({
         Word: t.raw,
+        Offset: timeOffset + i * 10000000,
+        Duration: 8000000,
         PronunciationAssessment: { AccuracyScore: (offset + i) === 3 ? 45 : ((offset + i) === 5 ? 70 : 88) }
       }));
       collectedResults = [
         {
           NBest: [{
-            PronunciationAssessment: { PronScore: 80, AccuracyScore: 82, FluencyScore: 78, ProsodyScore: 80, CompletenessScore: 90 },
-            Words: makeWords(sourceTokens.slice(0, mid), 0)
+            PronunciationAssessment: { ProsodyScore: 80 },
+            Words: makeWords(sourceTokens.slice(0, mid), 0, 0)
           }]
         },
         {
           NBest: [{
-            PronunciationAssessment: { PronScore: 84, AccuracyScore: 87, FluencyScore: 79, ProsodyScore: 81, CompletenessScore: 92 },
-            Words: makeWords(sourceTokens.slice(mid), mid)
+            PronunciationAssessment: { ProsodyScore: 81 },
+            Words: makeWords(sourceTokens.slice(mid), mid, mid * 10000000)
           }]
         }
       ];
@@ -233,6 +235,7 @@
       const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
       const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
       pronunciationConfig.applyTo(recognizer);
+      pronunciationConfig.enableProsodyAssessment = true;
 
       recognizer.recognized = (_, e) => {
         if (epoch !== assessmentEpoch) return;
@@ -267,6 +270,8 @@
       const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
       const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
       pronunciationConfig.applyTo(recognizer);
+      pronunciationConfig.enableProsodyAssessment = true;
+
       return new Promise((resolve, reject) => {
         recognizer.recognizeOnceAsync(
           result => {
@@ -305,20 +310,49 @@
       });
     }
 
-    function computeOverall(results) {
-      const sum = { PronScore: 0, AccuracyScore: 0, FluencyScore: 0, ProsodyScore: 0, CompletenessScore: 0 };
-      let totalWords = 0;
-      for (const r of results) {
-        const nbest = r.NBest?.[0];
-        const pa = nbest?.PronunciationAssessment;
-        const wc = nbest?.Words?.length || 0;
-        if (!pa || wc === 0) continue;
-        totalWords += wc;
-        for (const k in sum) sum[k] += (pa[k] || 0) * wc;
+    function computeOverallScores(results, sourceTokens) {
+      const allWords = results.flatMap(r => getRecoWords(r));
+      const aligned = align(sourceTokens, allWords);
+
+      // ponytail: 按 Azure 官方 JS 示例重新计算总体分数，不直接取每 utterance 的平均
+      const nonExtra = aligned.filter(t => t.status !== 'extra');
+      const accuracyScore = nonExtra.length > 0
+        ? Math.round(nonExtra.reduce((sum, t) => sum + (t.score || 0), 0) / nonExtra.length)
+        : 0;
+
+      let fluencyScore = 0;
+      if (allWords.length > 0) {
+        const startOffset = allWords[0].Offset;
+        const lastWord = allWords[allWords.length - 1];
+        const endOffset = lastWord.Offset + lastWord.Duration;
+        const totalDuration = allWords.reduce((sum, w) => sum + (w.Duration || 0) + 100000, 0);
+        if (endOffset > startOffset) {
+          fluencyScore = Math.min(100, Math.round((totalDuration / (endOffset - startOffset)) * 100));
+        }
       }
-      if (totalWords === 0) return sum;
-      for (const k in sum) sum[k] = Math.round(sum[k] / totalWords);
-      return sum;
+
+      const prosodyScores = results
+        .map(r => r.NBest?.[0]?.PronunciationAssessment?.ProsodyScore)
+        .filter(v => v !== undefined && !Number.isNaN(v));
+      const prosodyScore = prosodyScores.length > 0
+        ? Math.round(prosodyScores.reduce((a, b) => a + b, 0) / prosodyScores.length)
+        : 0;
+
+      const validWordCount = aligned.filter(t => t.status === 'ok').length;
+      const completenessScore = sourceTokens.length > 0
+        ? Math.round((validWordCount / sourceTokens.length) * 100)
+        : 0;
+
+      let pronScore;
+      if (prosodyScore > 0) {
+        const sorted = [accuracyScore, prosodyScore, completenessScore, fluencyScore].sort((a, b) => a - b);
+        pronScore = Math.round(sorted[0] * 0.4 + sorted[1] * 0.2 + sorted[2] * 0.2 + sorted[3] * 0.2);
+      } else {
+        const sorted = [accuracyScore, completenessScore, fluencyScore].sort((a, b) => a - b);
+        pronScore = Math.round(sorted[0] * 0.6 + sorted[1] * 0.2 + sorted[2] * 0.2);
+      }
+
+      return { PronScore: pronScore, AccuracyScore: accuracyScore, FluencyScore: fluencyScore, ProsodyScore: prosodyScore, CompletenessScore: completenessScore };
     }
 
     function finishAssessment(text) {
@@ -329,8 +363,9 @@
         return;
       }
       const words = collectedResults.flatMap(r => getRecoWords(r));
-      const overall = computeOverall(collectedResults);
-      const aligned = align(tokenize(text), words);
+      const sourceTokens = tokenize(text);
+      const overall = computeOverallScores(collectedResults, sourceTokens);
+      const aligned = align(sourceTokens, words);
       console.table(aligned);
       renderResults(aligned, overall);
     }
