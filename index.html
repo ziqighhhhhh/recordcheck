@@ -20,7 +20,7 @@
   <h1>英语朗读练习</h1>
   <div class="section" id="setup">
     <label>Azure Region</label>
-    <input id="region" type="text" placeholder="westus2" value="westus2">
+    <input id="region" type="text" placeholder="eastus" value="eastus">
     <label>Azure Subscription Key</label>
     <input id="key" type="password" placeholder="输入你的 Azure Speech Key">
     <label>英文原文</label>
@@ -33,6 +33,7 @@
     <p id="recText"></p>
     <p>录音时长：<span id="recTimer">0.0</span>s</p>
     <button id="stopBtn">停止录音</button>
+    <button id="restartBtn">重新开始</button>
   </div>
   <div class="section" id="results" style="display:none">
     <div id="scores"></div>
@@ -55,25 +56,36 @@
     console.log('SpeechSDK:', typeof SpeechSDK);
 
     const $ = id => document.getElementById(id);
+    let currentRecognizer = null;
+    let collectedResults = [];
+    let assessmentEpoch = 0;
+
     $('demoBtn').onclick = () => {
       $('sourceText').value = "I've always wanted to build a one-person business.";
     };
     $('mockBtn').onclick = () => {
       const text = $('sourceText').value.trim() || "I've always wanted to build a one-person business.";
       const sourceTokens = tokenize(text);
-      const mockResult = {
-        NBest: [{
-          PronunciationAssessment: { PronScore: 82, AccuracyScore: 85, FluencyScore: 78, ProsodyScore: 80 },
-          Words: sourceTokens.map((t, i) => ({
-            Word: t.raw,
-            PronunciationAssessment: { AccuracyScore: i === 3 ? 45 : (i === 5 ? 70 : 88) }
-          }))
-        }]
-      };
-      const words = getRecoWords(mockResult);
-      const aligned = align(sourceTokens, words);
-      window.lastAligned = aligned;
-      renderResults(aligned, mockResult.NBest[0].PronunciationAssessment);
+      const mid = Math.ceil(sourceTokens.length / 2);
+      const makeWords = (tokens, offset) => tokens.map((t, i) => ({
+        Word: t.raw,
+        PronunciationAssessment: { AccuracyScore: (offset + i) === 3 ? 45 : ((offset + i) === 5 ? 70 : 88) }
+      }));
+      collectedResults = [
+        {
+          NBest: [{
+            PronunciationAssessment: { PronScore: 80, AccuracyScore: 82, FluencyScore: 78, ProsodyScore: 80, CompletenessScore: 90 },
+            Words: makeWords(sourceTokens.slice(0, mid), 0)
+          }]
+        },
+        {
+          NBest: [{
+            PronunciationAssessment: { PronScore: 84, AccuracyScore: 87, FluencyScore: 79, ProsodyScore: 81, CompletenessScore: 92 },
+            Words: makeWords(sourceTokens.slice(mid), mid)
+          }]
+        }
+      ];
+      finishAssessment(text);
     };
 
     let recInterval;
@@ -86,6 +98,21 @@
       recInterval = setInterval(() => {
         $('recTimer').textContent = ((Date.now() - start) / 1000).toFixed(1);
       }, 100);
+    }
+    // ponytail: 用 Web Audio API 发声，无需额外音频文件
+    function playBeep(frequency = 880, duration = 150) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = frequency;
+      osc.type = 'sine';
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration / 1000);
+      osc.stop(ctx.currentTime + duration / 1000);
     }
     function normalizeWord(w) {
       return w.toLowerCase()
@@ -192,14 +219,50 @@
       $('drillStatus').textContent = `第 ${drillIndex + 1}/${drillQueue.length} 个`;
     }
 
-    async function assessPronunciation(text, key, region) {
+    function startContinuousAssessment(text, key, region, callbacks) {
+      const epoch = ++assessmentEpoch;
+      const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(key, region);
+      speechConfig.speechRecognitionLanguage = 'en-US';
+      // ponytail: 连续模式下 EnableMiscue 不生效，我们自己做对齐
+      const pronunciationConfig = new SpeechSDK.PronunciationAssessmentConfig(
+        text,
+        SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
+        SpeechSDK.PronunciationAssessmentGranularity.Phoneme,
+        false
+      );
+      const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+      const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+      pronunciationConfig.applyTo(recognizer);
+
+      recognizer.recognized = (_, e) => {
+        if (epoch !== assessmentEpoch) return;
+        if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+          const json = e.result.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult);
+          callbacks.onResult(JSON.parse(json));
+        }
+      };
+      recognizer.canceled = (_, e) => {
+        if (epoch !== assessmentEpoch) return;
+        callbacks.onError(e.errorDetails || e.reason);
+      };
+      recognizer.sessionStopped = () => {
+        if (epoch !== assessmentEpoch) return;
+        callbacks.onStopped();
+      };
+
+      recognizer.startContinuousRecognitionAsync();
+      return recognizer;
+    }
+
+    // ponytail: Drill 目标是短句/单词，30 秒内可完成，用一次性识别最简单
+    async function assessOnce(text, key, region) {
       const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(key, region);
       speechConfig.speechRecognitionLanguage = 'en-US';
       const pronunciationConfig = new SpeechSDK.PronunciationAssessmentConfig(
         text,
         SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
         SpeechSDK.PronunciationAssessmentGranularity.Phoneme,
-        true
+        false
       );
       const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
       const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
@@ -212,7 +275,7 @@
               const json = result.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult);
               resolve(JSON.parse(json));
             } else {
-              reject(new Error('识别失败: ' + result.errorDetails || result.reason));
+              reject(new Error('识别失败: ' + (result.errorDetails || result.reason)));
             }
           },
           err => { recognizer.close(); reject(err); }
@@ -220,34 +283,80 @@
       });
     }
 
-    $('startBtn').onclick = async () => {
+    function beginAssessment() {
+      if (currentRecognizer) return; // 防止重复开始
       const region = $('region').value.trim();
       const key = $('key').value.trim();
       const text = $('sourceText').value.trim();
       if (!region || !key || !text) { alert('请填写完整'); return; }
+
+      collectedResults = [];
       showRecording(text);
-      try {
-        const result = await assessPronunciation(text, key, region);
-        const words = getRecoWords(result);
-        const sourceTokens = tokenize(text);
-        const aligned = align(sourceTokens, words);
-        console.table(aligned);
-        const nbest = result.NBest?.[0];
-        renderResults(aligned, nbest.PronunciationAssessment);
-        clearInterval(recInterval);
-      } catch (e) {
-        clearInterval(recInterval);
-        const msg = e.message || '';
-        if (msg.includes('401') || msg.includes('403')) showError('Azure Key 或 Region 无效，请检查 Azure 门户');
-        else if (msg.includes('network') || msg.includes('ECONNREFUSED')) showError('连接 Azure 失败，请检查网络');
-        else if (msg.includes('NotAllowed')) showError('麦克风权限被拒绝，请在浏览器设置中允许');
-        else if (msg.includes('识别失败')) showError('未检测到语音，请靠近麦克风再试一次');
-        else showError('出错了：' + msg);
+      playBeep(880, 150); // 录音开始提示音
+
+      currentRecognizer = startContinuousAssessment(text, key, region, {
+        onResult: r => collectedResults.push(r),
+        onError: msg => {
+          clearInterval(recInterval);
+          currentRecognizer = null;
+          handleSpeechError(msg);
+        },
+        onStopped: () => finishAssessment(text)
+      });
+    }
+
+    function computeOverall(results) {
+      const sum = { PronScore: 0, AccuracyScore: 0, FluencyScore: 0, ProsodyScore: 0, CompletenessScore: 0 };
+      let totalWords = 0;
+      for (const r of results) {
+        const nbest = r.NBest?.[0];
+        const pa = nbest?.PronunciationAssessment;
+        const wc = nbest?.Words?.length || 0;
+        if (!pa || wc === 0) continue;
+        totalWords += wc;
+        for (const k in sum) sum[k] += (pa[k] || 0) * wc;
       }
-    };
-    $('stopBtn').onclick = () => {
+      if (totalWords === 0) return sum;
+      for (const k in sum) sum[k] = Math.round(sum[k] / totalWords);
+      return sum;
+    }
+
+    function finishAssessment(text) {
+      currentRecognizer = null;
       clearInterval(recInterval);
-      console.log('stopped');
+      if (collectedResults.length === 0) {
+        showError('未检测到语音，请靠近麦克风再试一次');
+        return;
+      }
+      const words = collectedResults.flatMap(r => getRecoWords(r));
+      const overall = computeOverall(collectedResults);
+      const aligned = align(tokenize(text), words);
+      console.table(aligned);
+      renderResults(aligned, overall);
+    }
+
+    function handleSpeechError(msg) {
+      msg = String(msg || '');
+      if (msg.includes('401') || msg.includes('403')) showError('Azure Key 或 Region 无效，请检查 Azure 门户');
+      else if (msg.includes('network') || msg.includes('ECONNREFUSED')) showError('连接 Azure 失败，请检查网络');
+      else if (msg.includes('NotAllowed')) showError('麦克风权限被拒绝，请在浏览器设置中允许');
+      else if (msg.includes('识别失败')) showError('未检测到语音，请靠近麦克风再试一次');
+      else showError('出错了：' + msg);
+    }
+
+    $('startBtn').onclick = beginAssessment;
+    $('stopBtn').onclick = () => {
+      playBeep(440, 200); // 录音完成提示音
+      if (currentRecognizer) currentRecognizer.stopContinuousRecognitionAsync();
+    };
+    $('restartBtn').onclick = () => {
+      if (currentRecognizer) {
+        const old = currentRecognizer;
+        currentRecognizer = null;
+        old.stopContinuousRecognitionAsync();
+      }
+      clearInterval(recInterval);
+      beginAssessment();
     };
     $('drillSentenceBtn').onclick = () => { buildDrillQueue(window.lastAligned, 'sentence'); runDrill(); };
     $('drillWordBtn').onclick = () => { buildDrillQueue(window.lastAligned, 'word'); runDrill(); };
@@ -255,7 +364,7 @@
       const target = drillQueue[drillIndex];
       const region = $('region').value.trim();
       const key = $('key').value.trim();
-      const result = await assessPronunciation(target, key, region);
+      const result = await assessOnce(target, key, region);
       const score = result.NBest?.[0]?.PronunciationAssessment?.PronScore || 0;
       $('drillStatus').textContent = `得分 ${score}；${score >= 80 ? '通过' : '再试一次'}`;
     };

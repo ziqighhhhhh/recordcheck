@@ -1,0 +1,26 @@
+<h2>Azure Speech API Key 怎么处理？</h2>
+<p class="subtitle">直接放在网页里会泄露，需要一种安全的使用方式</p>
+
+<div class="options">
+  <div class="option" data-choice="backend" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>本地后端代理</h3>
+      <p>在电脑上用 Python/Node 起一个极小的本地服务，由它调用 Azure，网页只和它通信</p>
+    </div>
+  </div>
+  <div class="option" data-choice="input" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>用户自行填入</h3>
+      <p>网页提供输入框，每次使用前填入自己的 Azure Key（只在本地浏览器使用，不持久化）</p>
+    </div>
+  </div>
+  <div class="option" data-choice="mock" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>先模拟数据</h3>
+      <p>第一版用模拟数据跑通流程，等有 Azure Key 了再替换真实接口</p>
+    </div>
+  </div>
+</div>

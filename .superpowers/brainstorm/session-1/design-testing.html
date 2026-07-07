@@ -1,0 +1,37 @@
+<h2>设计 A：测试策略</h2>
+<p class="subtitle">用最小成本验证关键路径</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">三层验证</div>
+    <div class="mockup-body">
+      <div style="margin-bottom:1rem">
+        <h4 style="margin:0 0 0.25rem 0">1. 静态冒烟测试</h4>
+        <ul style="margin:0">
+          <li>HTML 文件能直接在浏览器打开</li>
+          <li>Azure SDK CDN 能正常加载</li>
+          <li>页面在手机 Safari 上布局不崩</li>
+        </ul>
+      </div>
+      <div style="margin-bottom:1rem">
+        <h4 style="margin:0 0 0.25rem 0">2. 模拟数据测试</h4>
+        <ul style="margin:0">
+          <li>不调用 Azure，用写死的评估 JSON 跑通 UI</li>
+          <li>验证高亮、分数、drill 切换是否正常</li>
+          <li>验证对齐算法对缩写/标点的处理</li>
+        </ul>
+      </div>
+      <div>
+        <h4 style="margin:0 0 0.25rem 0">3. 真实录音测试（iOS 重点）</h4>
+        <ul style="margin:0">
+          <li>在 iPhone Safari 上请求麦克风权限</li>
+          <li>录制 30 秒英文，确认 Azure 返回结果</li>
+          <li>测试开始/停止/重录的稳定性</li>
+          <li>测试 drill 模式下反复录音是否卡顿</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">由于你主要在 iOS 上使用，真实录音测试以 iPhone Safari 为最高优先级，桌面浏览器作为开发调试工具。</p>

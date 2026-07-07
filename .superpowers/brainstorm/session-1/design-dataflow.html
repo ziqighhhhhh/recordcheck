@@ -1,0 +1,55 @@
+<h2>设计 A：数据流</h2>
+<p class="subtitle">从用户点击“开始”到看到高亮结果的流程</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">录音与评估流程</div>
+    <div class="mockup-body" style="font-family:monospace;font-size:0.9rem">
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
+        <span style="background:#e0e7ff;padding:2px 6px;border-radius:4px">1</span>
+        <span>用户粘贴原文 + 填入 Azure Key/Region</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
+        <span style="background:#e0e7ff;padding:2px 6px;border-radius:4px">2</span>
+        <span>浏览器请求麦克风权限 → 开始录音</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
+        <span style="background:#e0e7ff;padding:2px 6px;border-radius:4px">3</span>
+        <span>音频流 → Azure Speech SDK（发音评估模式）</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
+        <span style="background:#e0e7ff;padding:2px 6px;border-radius:4px">4</span>
+        <span>Azure 返回：识别文本 + 词/音素级分数</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
+        <span style="background:#e0e7ff;padding:2px 6px;border-radius:4px">5</span>
+        <span>前端对齐：原文 vs 识别结果（忽略大小写、标点、缩写）</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
+        <span style="background:#e0e7ff;padding:2px 6px;border-radius:4px">6</span>
+        <span>UI 高亮：绿/黄/红 + 总体与维度分数</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem">
+        <span style="background:#e0e7ff;padding:2px 6px;border-radius:4px">7</span>
+        <span>用户点击问题区域 → 进入 Drill（句/词循环录音）</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">对齐算法要点</div>
+    <div class="mockup-body">
+      <ul>
+        <li><strong>归一化</strong>：I’ve → ive，I’m → im，去掉标点，统一小写</li>
+        <li><strong>顺序匹配</strong>：按词序逐词对比原文与识别文本</li>
+        <li><strong>漏词</strong>：原文有但识别无 → 标红</li>
+        <li><strong>错词</strong>：位置相同但文本不同 → 标红/黄（看 Azure 发音分）</li>
+        <li><strong>多词</strong>：识别有但原文无 → 标黄提示</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">关键依赖：Azure Speech JS SDK 从 CDN 加载；录音使用浏览器 MediaRecorder 或 SDK 内置麦克风。</p>

@@ -1,0 +1,33 @@
+<h2>设计 A：总体架构</h2>
+<p class="subtitle">单文件网页应用，浏览器直连 Azure Speech</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">系统边界</div>
+    <div class="mockup-body" style="font-family:system-ui,sans-serif">
+      <div style="display:flex;flex-direction:column;gap:1rem;align-items:center">
+        <div style="border:2px solid #4f46e5;border-radius:8px;padding:1rem;width:260px;text-align:center;background:#eef2ff">
+          <strong>朗读练习网页</strong><br>
+          <span style="font-size:0.85rem;color:#666">HTML + CSS + JS（单文件）</span>
+        </div>
+        <div style="font-size:1.5rem;color:#666">↕ 浏览器内录音 + HTTPS</div>
+        <div style="border:2px solid #0891b2;border-radius:8px;padding:1rem;width:260px;text-align:center;background:#ecfeff">
+          <strong>Azure Speech Services</strong><br>
+          <span style="font-size:0.85rem;color:#666">发音评估 API</span>
+        </div>
+      </div>
+      <div style="margin-top:1.5rem;padding:1rem;background:#f8fafc;border-radius:6px">
+        <h4 style="margin-top:0">网页内部模块</h4>
+        <ul style="margin-bottom:0">
+          <li><strong>配置区</strong>：Azure region + key + 语言（默认 en-US）</li>
+          <li><strong>文本区</strong>：粘贴原文</li>
+          <li><strong>录音控制</strong>：开始 / 停止 / 重录</li>
+          <li><strong>结果展示</strong>：原文高亮（绿/黄/红）</li>
+          <li><strong> drill 面板</strong>：切换到问题句 / 问题词循环练习</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">核心原则：无后端、无构建步骤、双击 HTML 即可运行。Azure Key 由用户在页面内填写，只在本地测试使用。</p>

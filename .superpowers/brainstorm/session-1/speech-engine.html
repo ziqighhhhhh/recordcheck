@@ -1,0 +1,26 @@
+<h2>语音识别引擎怎么选？</h2>
+<p class="subtitle">发音评分和语调分析需要不同程度的“听力”能力</p>
+
+<div class="options">
+  <div class="option" data-choice="free" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>最简单免费</h3>
+      <p>只用浏览器内置 Web Speech API。能判断漏读/多读/读错词，但发音和语调只给粗略提示</p>
+    </div>
+  </div>
+  <div class="option" data-choice="cloud" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>专业云端服务</h3>
+      <p>接入 Azure Speech 等云服务，可给出音节级发音分数、语调建议，但需要 API Key 和联网</p>
+    </div>
+  </div>
+  <div class="option" data-choice="extensible" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>先简单，再扩展</h3>
+      <p>第一版用浏览器内置识别，但设计好接口，以后可替换为专业引擎</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,76 @@
+<h2>设计 A：界面流程</h2>
+<p class="subtitle">4 个核心页面/状态</p>
+
+<div class="section">
+  <h3>1. 准备页面</h3>
+  <div class="mockup">
+    <div class="mockup-header">准备朗读</div>
+    <div class="mockup-body">
+      <div class="mock-input" style="margin-bottom:0.5rem">Azure Region（如 westus2）</div>
+      <div class="mock-input" style="margin-bottom:0.5rem">Azure Subscription Key</div>
+      <div class="mock-content" style="min-height:80px;margin-bottom:0.5rem">在此处粘贴英文原文...</div>
+      <div style="display:flex;gap:0.5rem">
+        <button class="mock-button">开始朗读评估</button>
+        <button class="mock-button">用示例文本试试</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>2. 录音页面</h3>
+  <div class="mockup">
+    <div class="mockup-header">正在录音</div>
+    <div class="mockup-body">
+      <div class="mock-content" style="min-height:80px;margin-bottom:0.5rem">The quick brown fox jumps over the lazy dog.</div>
+      <div style="display:flex;align-items:center;gap:1rem">
+        <div style="width:12px;height:12px;background:red;border-radius:50%"></div>
+        <span>00:03.2</span>
+        <button class="mock-button">停止</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>3. 结果页面（全文模式）</h3>
+  <div class="mockup">
+    <div class="mockup-header">评估结果</div>
+    <div class="mockup-body">
+      <div style="margin-bottom:0.75rem">
+        <span style="background:#dcfce7;padding:2px 6px;border-radius:4px">总体 82</span>
+        <span style="background:#dbeafe;padding:2px 6px;border-radius:4px">准确度 85</span>
+        <span style="background:#fef3c7;padding:2px 6px;border-radius:4px">流畅度 78</span>
+        <span style="background:#fce7f3;padding:2px 6px;border-radius:4px">语调 80</span>
+      </div>
+      <div class="mock-content" style="line-height:1.8">
+        The <span style="background:#bbf7d0">quick</span> <span style="background:#fecaca;text-decoration:line-through">brown</span> fox <span style="background:#fef08a">jumps</span> over the lazy dog.
+      </div>
+      <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
+        <button class="mock-button">重新读全文</button>
+        <button class="mock-button">练习标红句子</button>
+        <button class="mock-button">练习标红单词</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>4. Drill 页面（句子/单词循环）</h3>
+  <div class="mockup">
+    <div class="mockup-header">重点练习</div>
+    <div class="mockup-body">
+      <div style="font-size:1.1rem;margin-bottom:1rem;background:#fff7ed;padding:1rem;border-radius:6px;border-left:4px solid #f97316">
+        jumps over the lazy dog
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+        <button class="mock-button">🔊 听标准发音</button>
+        <button class="mock-button">🎙️ 我读</button>
+        <button class="mock-button">下一个</button>
+      </div>
+      <div style="color:#666;font-size:0.85rem">目标：读到 80 分以上自动解锁下一个</div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">说明：绿色 = 读得好；黄色 = 有提升空间；红色 = 明显错误/漏读。点击问题区域可直接进入 drill。</p>

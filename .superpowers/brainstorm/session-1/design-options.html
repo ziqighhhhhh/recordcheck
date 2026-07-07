@@ -1,0 +1,40 @@
+<h2>整体设计方案</h2>
+<p class="subtitle">基于你的选择：网页应用、手动粘贴原文、需要 A-D 全维度反馈、混合练习模式、测试阶段简化 Key 处理</p>
+
+<div class="options">
+  <div class="option" data-choice="singlefile" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>单文件网页应用（推荐）</h3>
+      <p>一个 HTML 文件 + 内嵌 JS/CSS。用户粘贴文本、填入 Azure Key、点击录音，浏览器直接调用 Azure Speech SDK，返回发音评估结果。UI 标红/标黄问题词句，支持“全文 → 重点句 → 重点词”的混合练习循环。</p>
+      <div class="pros-cons" style="margin-top:0.75rem">
+        <div class="pros"><h4>优点</h4><ul><li>构建最简单，双击就能打开</li><li>无后端、无依赖</li><li>迭代最快</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>Azure Key 在浏览器中可见</li><li>只适合自己测试用</li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="proxy" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>网页 + 本地代理</h3>
+      <p>前端负责录音和展示，本地起一个极小的 Node/Python 服务作为代理。浏览器把音频发给本地服务，由它持有 Azure Key 并调用 Azure Speech。Key 不暴露给网页。</p>
+      <div class="pros-cons" style="margin-top:0.75rem">
+        <div class="pros"><h4>优点</h4><ul><li>Key 不泄露</li><li>更接近真实产品架构</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>要同时跑前端和后端</li><li>部署/调试多一步</li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="mock" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Mock 数据先行</h3>
+      <p>先用模拟的发音评估数据把完整 UI 和练习流程跑通，包括标红、分数、句子/单词循环。等流程验证无误后，再把模拟层替换为真实的 Azure Speech 调用。</p>
+      <div class="pros-cons" style="margin-top:0.75rem">
+        <div class="pros"><h4>优点</h4><ul><li>不需要 Azure Key</li><li>最快验证交互</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>反馈不是真实的</li><li>后续需要一次“接真实 API”的改造</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle"><strong>我的推荐：A</strong>。既然当前是测试阶段、追求最简路径，单文件网页应用能最快让你用上真实反馈；Key 暴露问题只在公开部署时才需要担心，本地测试完全可接受。</p>
