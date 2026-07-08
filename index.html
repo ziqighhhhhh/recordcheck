@@ -28,7 +28,12 @@
     .section-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
     .section-kicker { margin:0 0 4px; color:var(--primary-active); font-size:12px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
     .section-title { margin:0; color:var(--text); font-size:clamp(22px,5vw,30px); font-weight:900; letter-spacing:.02em; line-height:1.2; }
-    .task-pill { display:inline-flex; align-items:center; gap:8px; min-height:29px; padding:0 12px; border:1.5px solid #f7cd67; border-radius:999px; background:rgba(247,205,103,.18); color:var(--text); font-size:13px; font-weight:700; white-space:nowrap; }
+    .task-pill { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:29px; padding:0 12px; border:1.5px solid #f7cd67; border-radius:999px; background:rgba(247,205,103,.18); color:var(--text); font-size:13px; font-weight:700; white-space:normal; text-align:center; }
+    .task-pill.status-listening { border-color:var(--primary); background:var(--primary-bg); color:var(--primary-active); animation:pulse-status 1s var(--ease) infinite; }
+    .task-pill.status-scoring { border-color:var(--warning); background:#fff3c8; }
+    .task-pill.status-pass { border-color:var(--success); background:#e9f6d4; color:#5a9e1e; }
+    .task-pill.status-retry,.task-pill.status-error { border-color:var(--error); background:#fbe0e0; color:var(--error-active); }
+    @keyframes pulse-status { 50% { transform:scale(1.03); } }
     .form-grid { display:grid; gap:16px; }
     @media (min-width:760px) { .form-grid.credentials { grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); } }
     label { display:block; margin:0 0 7px; color:var(--text); font-size:14px; font-weight:800; letter-spacing:.02em; }
@@ -43,6 +48,7 @@
     button:hover { border-color:var(--primary); color:var(--primary-active); transform:translateY(-1px); box-shadow:0 3px 10px 0 rgba(61,52,40,.10); }
     button:active { transform:translateY(0); box-shadow:0 2px 4px 0 rgba(61,52,40,.06); }
     button:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+    button:disabled { opacity:.58; cursor:not-allowed; transform:none!important; box-shadow:none!important; }
     #startBtn,#drillRecordBtn { min-height:48px; padding:0 32px; border-color:var(--bg); background:var(--bg); box-shadow:0 5px 0 0 var(--shadow-btn); font-size:16px; }
     #startBtn:hover,#drillRecordBtn:hover { box-shadow:0 6px 0 0 var(--shadow-btn); transform:translateY(-1px); }
     #startBtn:active,#drillRecordBtn:active { box-shadow:0 1px 0 0 var(--shadow-btn); transform:translateY(2px); }
@@ -50,7 +56,7 @@
     #stopBtn:hover { color:#fff; box-shadow:0 6px 0 0 var(--error-active); transform:translateY(-1px); }
     #stopBtn:active { box-shadow:0 1px 0 0 var(--error-active); transform:translateY(2px); }
     .task-card { width:100%; border:2px dashed #e8dcc8; border-radius:var(--r-lg); background:rgba(255,253,247,.78); padding:18px; }
-    #recText,#drillTarget { margin:0; color:var(--text-body); font-size:clamp(18px,4vw,24px); font-weight:800; line-height:1.75; text-align:center; word-break:break-word; }
+    #recText,#drillTarget { margin:0; color:var(--text-body); font-size:clamp(18px,4vw,24px); font-weight:800; line-height:1.75; text-align:left; word-break:break-word; white-space:pre-wrap; }
     .timer-card { display:inline-flex; align-items:center; justify-content:center; gap:14px; min-height:58px; padding:10px 26px; border:3px solid #d4cfc3; border-radius:var(--r-base); background:linear-gradient(180deg,#fff 0%,var(--bg) 100%); color:#8b7355; font-size:20px; font-weight:900; letter-spacing:.03em; }
     .recording-stack,.drill-stack,.results-stack { display:flex; flex-direction:column; gap:18px; align-items:center; }
     #scores { display:grid; width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
@@ -292,6 +298,13 @@
     function showError(msg) {
       alert(msg); // ponytail: 先用 alert，后续可换成页面内提示
     }
+    function scoreDisplay(value) {
+      return value === null || value === undefined || Number.isNaN(value) ? '暂无' : value;
+    }
+    function setDrillStatus(text, statusClass = '') {
+      $('drillStatus').textContent = text;
+      $('drillStatus').className = `task-pill ${statusClass}`.trim();
+    }
     function renderResults(aligned, overall) {
       window.lastAligned = aligned;
       $('setup').style.display = 'none';
@@ -301,7 +314,7 @@
         <div class="score-card"><div class="score-label">总体</div><div class="score-value">${overall.PronScore}</div></div>
         <div class="score-card"><div class="score-label">准确度</div><div class="score-value">${overall.AccuracyScore}</div></div>
         <div class="score-card"><div class="score-label">流畅度</div><div class="score-value">${overall.FluencyScore}</div></div>
-        <div class="score-card"><div class="score-label">语调</div><div class="score-value">${overall.ProsodyScore}</div></div>
+        <div class="score-card"><div class="score-label">语调</div><div class="score-value">${scoreDisplay(overall.ProsodyScore)}</div></div>
       `;
       $('highlighted').innerHTML = aligned.map(t => {
         const bg = scoreToColor(t.score, t.status);
@@ -346,13 +359,14 @@
       $('drill').style.display = 'block';
       const target = drillQueue[drillIndex];
       $('drillTarget').textContent = target;
-      $('drillStatus').textContent = `第 ${drillIndex + 1}/${drillQueue.length} 个`;
+      setDrillStatus(`第 ${drillIndex + 1}/${drillQueue.length} 个，点击“我读”开始录音`);
     }
 
     function startContinuousAssessment(text, key, region, callbacks) {
       const epoch = ++assessmentEpoch;
       const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(key, region);
       speechConfig.speechRecognitionLanguage = 'en-US';
+      speechConfig.outputFormat = SpeechSDK.OutputFormat.Detailed;
       // ponytail: 连续模式下 EnableMiscue 不生效，我们自己做对齐
       const pronunciationConfig = new SpeechSDK.PronunciationAssessmentConfig(
         text,
@@ -362,8 +376,8 @@
       );
       const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
       const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
-      pronunciationConfig.applyTo(recognizer);
       pronunciationConfig.enableProsodyAssessment = true;
+      pronunciationConfig.applyTo(recognizer);
 
       recognizer.recognized = (_, e) => {
         if (epoch !== assessmentEpoch) return;
@@ -386,9 +400,11 @@
     }
 
     // ponytail: Drill 目标是短句/单词，30 秒内可完成，用一次性识别最简单
-    async function assessOnce(text, key, region) {
+    let drillAssessing = false;
+    async function assessOnce(text, key, region, callbacks = {}) {
       const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(key, region);
       speechConfig.speechRecognitionLanguage = 'en-US';
+      speechConfig.outputFormat = SpeechSDK.OutputFormat.Detailed;
       const pronunciationConfig = new SpeechSDK.PronunciationAssessmentConfig(
         text,
         SpeechSDK.PronunciationAssessmentGradingSystem.HundredMark,
@@ -397,12 +413,16 @@
       );
       const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
       const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
-      pronunciationConfig.applyTo(recognizer);
       pronunciationConfig.enableProsodyAssessment = true;
+      pronunciationConfig.applyTo(recognizer);
+      recognizer.speechStartDetected = () => callbacks.onSpeechStart?.();
+      recognizer.speechEndDetected = () => callbacks.onSpeechEnd?.();
 
       return new Promise((resolve, reject) => {
+        callbacks.onStart?.();
         recognizer.recognizeOnceAsync(
           result => {
+            callbacks.onStop?.();
             recognizer.close();
             if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
               const json = result.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult);
@@ -411,7 +431,7 @@
               reject(new Error('识别失败: ' + (result.errorDetails || result.reason)));
             }
           },
-          err => { recognizer.close(); reject(err); }
+          err => { callbacks.onStop?.(); recognizer.close(); reject(err); }
         );
       });
     }
@@ -464,7 +484,7 @@
         .filter(v => v !== undefined && !Number.isNaN(v));
       const prosodyScore = prosodyScores.length > 0
         ? Math.round(prosodyScores.reduce((a, b) => a + b, 0) / prosodyScores.length)
-        : 0;
+        : null;
 
       const validWordCount = aligned.filter(t => t.status === 'ok').length;
       const completenessScore = sourceTokens.length > 0
@@ -472,7 +492,7 @@
         : 0;
 
       let pronScore;
-      if (prosodyScore > 0) {
+      if (prosodyScore !== null && prosodyScore > 0) {
         const sorted = [accuracyScore, prosodyScore, completenessScore, fluencyScore].sort((a, b) => a - b);
         pronScore = Math.round(sorted[0] * 0.4 + sorted[1] * 0.2 + sorted[2] * 0.2 + sorted[3] * 0.2);
       } else {
@@ -524,12 +544,48 @@
     $('drillSentenceBtn').onclick = () => { buildDrillQueue(window.lastAligned, 'sentence'); runDrill(); };
     $('drillWordBtn').onclick = () => { buildDrillQueue(window.lastAligned, 'word'); runDrill(); };
     $('drillRecordBtn').onclick = async () => {
+      if (drillAssessing) return;
       const target = drillQueue[drillIndex];
       const region = $('region').value.trim();
       const key = $('key').value.trim();
-      const result = await assessOnce(target, key, region);
-      const score = result.NBest?.[0]?.PronunciationAssessment?.PronScore || 0;
-      $('drillStatus').textContent = `得分 ${score}；${score >= 80 ? '通过' : '再试一次'}`;
+      if (!target) { setDrillStatus('没有可练习的内容', 'status-error'); return; }
+      if (!region || !key) { setDrillStatus('请先填写 Azure Region 和 Key', 'status-error'); return; }
+
+      drillAssessing = true;
+      $('drillRecordBtn').disabled = true;
+      $('drillRecordBtn').textContent = '正在听...';
+      setDrillStatus('录音已开始，请朗读上方内容', 'status-listening');
+      playBeep(880, 120);
+      let heardEnd = false;
+
+      try {
+        const result = await assessOnce(target, key, region, {
+          onSpeechStart: () => setDrillStatus('听到了，请继续读完', 'status-listening'),
+          onSpeechEnd: () => {
+            heardEnd = true;
+            playBeep(440, 120);
+            setDrillStatus('录音结束，正在评分...', 'status-scoring');
+          },
+          onStop: () => {
+            if (!heardEnd) {
+              playBeep(440, 120);
+              setDrillStatus('录音结束，正在评分...', 'status-scoring');
+            }
+          }
+        });
+        const score = result.NBest?.[0]?.PronunciationAssessment?.PronScore;
+        if (score === undefined || Number.isNaN(score)) {
+          setDrillStatus('没有拿到评分，请再读一次', 'status-retry');
+        } else {
+          setDrillStatus(`得分 ${score}；${score >= 80 ? '通过' : '再试一次'}`, score >= 80 ? 'status-pass' : 'status-retry');
+        }
+      } catch (e) {
+        setDrillStatus('评估失败：' + (e.message || e), 'status-error');
+      } finally {
+        drillAssessing = false;
+        $('drillRecordBtn').disabled = false;
+        $('drillRecordBtn').textContent = '我读';
+      }
     };
     $('playTtsBtn').onclick = () => {
       const target = drillQueue[drillIndex];
