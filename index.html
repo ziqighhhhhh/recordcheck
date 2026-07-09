@@ -50,6 +50,8 @@
     button:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
     button:disabled { opacity:.58; cursor:not-allowed; transform:none!important; box-shadow:none!important; }
     #startBtn,#drillRecordBtn { min-height:48px; padding:0 32px; border-color:var(--bg); background:var(--bg); box-shadow:0 5px 0 0 var(--shadow-btn); font-size:16px; }
+    #drillRecordBtn.is-recording { border-color:var(--error-active); background:var(--error); color:#fff; box-shadow:0 5px 0 0 var(--error-active); }
+    #drillRecordBtn.is-scoring { border-color:var(--warning); background:#fff3c8; color:var(--text); box-shadow:none; }
     #startBtn:hover,#drillRecordBtn:hover { box-shadow:0 6px 0 0 var(--shadow-btn); transform:translateY(-1px); }
     #startBtn:active,#drillRecordBtn:active { box-shadow:0 1px 0 0 var(--shadow-btn); transform:translateY(2px); }
     #stopBtn { border-color:var(--error-active); background:var(--error); color:#fff; box-shadow:0 5px 0 0 var(--error-active); }
@@ -399,9 +401,43 @@
       return recognizer;
     }
 
-    // ponytail: Drill 目标是短句/单词，30 秒内可完成，用一次性识别最简单
-    let drillAssessing = false;
-    async function assessOnce(text, key, region, callbacks = {}) {
+    // Drill 练习由用户手动开始/结束，停止后立即汇总评分。
+    let drillRecognizer = null;
+    let drillResults = [];
+    let drillTimer = null;
+    let drillStartedAt = 0;
+    let drillTargetText = '';
+
+    function setDrillButton(state) {
+      $('drillRecordBtn').className = '';
+      $('drillRecordBtn').disabled = false;
+      if (state === 'recording') {
+        $('drillRecordBtn').textContent = '结束并评分';
+        $('drillRecordBtn').classList.add('is-recording');
+      } else if (state === 'scoring') {
+        $('drillRecordBtn').textContent = '评分中...';
+        $('drillRecordBtn').classList.add('is-scoring');
+        $('drillRecordBtn').disabled = true;
+      } else {
+        $('drillRecordBtn').textContent = '我读';
+      }
+    }
+
+    function startDrillTimer() {
+      clearInterval(drillTimer);
+      drillStartedAt = Date.now();
+      drillTimer = setInterval(() => {
+        const seconds = ((Date.now() - drillStartedAt) / 1000).toFixed(1);
+        setDrillStatus(`正在录音 ${seconds}s，再点一次“结束并评分”`, 'status-listening');
+      }, 100);
+    }
+
+    function stopDrillTimer() {
+      clearInterval(drillTimer);
+      drillTimer = null;
+    }
+
+    function startDrillAssessment(text, key, region) {
       const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(key, region);
       speechConfig.speechRecognitionLanguage = 'en-US';
       speechConfig.outputFormat = SpeechSDK.OutputFormat.Detailed;
@@ -415,25 +451,67 @@
       const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
       pronunciationConfig.enableProsodyAssessment = true;
       pronunciationConfig.applyTo(recognizer);
-      recognizer.speechStartDetected = () => callbacks.onSpeechStart?.();
-      recognizer.speechEndDetected = () => callbacks.onSpeechEnd?.();
 
-      return new Promise((resolve, reject) => {
-        callbacks.onStart?.();
-        recognizer.recognizeOnceAsync(
-          result => {
-            callbacks.onStop?.();
-            recognizer.close();
-            if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
-              const json = result.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult);
-              resolve(JSON.parse(json));
-            } else {
-              reject(new Error('识别失败: ' + (result.errorDetails || result.reason)));
-            }
-          },
-          err => { callbacks.onStop?.(); recognizer.close(); reject(err); }
-        );
-      });
+      recognizer.speechStartDetected = () => setDrillStatus('听到了，请继续读完；读完后点“结束并评分”', 'status-listening');
+      recognizer.speechEndDetected = () => setDrillStatus('检测到停顿，可以点“结束并评分”', 'status-listening');
+      recognizer.recognized = (_, e) => {
+        if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+          const json = e.result.properties.getProperty(SpeechSDK.PropertyId.SpeechServiceResponse_JsonResult);
+          drillResults.push(JSON.parse(json));
+        }
+      };
+      recognizer.canceled = (_, e) => finishDrillAssessment(e.errorDetails || e.reason);
+      recognizer.sessionStopped = () => finishDrillAssessment();
+      recognizer.startContinuousRecognitionAsync(
+        () => {
+          playBeep(1040, 180);
+          playBeep(1320, 100);
+          drillRecognizer = recognizer;
+          drillTargetText = text;
+          drillResults = [];
+          setDrillButton('recording');
+          startDrillTimer();
+          setDrillStatus('录音已开始，再点一次“结束并评分”', 'status-listening');
+        },
+        err => {
+          recognizer.close();
+          finishDrillAssessment(err);
+        }
+      );
+    }
+
+    function requestStopDrillAssessment() {
+      if (!drillRecognizer) return;
+      stopDrillTimer();
+      setDrillButton('scoring');
+      setDrillStatus('录音结束，正在评分...', 'status-scoring');
+      playBeep(520, 220);
+      const recognizer = drillRecognizer;
+      drillRecognizer = null;
+      recognizer.stopContinuousRecognitionAsync(
+        () => recognizer.close(),
+        err => finishDrillAssessment(err)
+      );
+    }
+
+    function finishDrillAssessment(error) {
+      stopDrillTimer();
+      setDrillButton('idle');
+      if (error) {
+        if (drillRecognizer) { drillRecognizer.close(); drillRecognizer = null; }
+        setDrillStatus('评估失败：' + error, 'status-error');
+        return;
+      }
+      if (drillResults.length === 0) {
+        setDrillStatus('没有检测到可评分的朗读，请再试一次', 'status-retry');
+        return;
+      }
+      const overall = computeOverallScores(drillResults, tokenize(drillTargetText));
+      if (overall.PronScore === undefined || Number.isNaN(overall.PronScore)) {
+        setDrillStatus('没有拿到评分，请再读一次', 'status-retry');
+        return;
+      }
+      setDrillStatus(`得分 ${overall.PronScore}；${overall.PronScore >= 80 ? '通过' : '再试一次'}`, overall.PronScore >= 80 ? 'status-pass' : 'status-retry');
     }
 
     function beginAssessment() {
@@ -543,49 +621,16 @@
     };
     $('drillSentenceBtn').onclick = () => { buildDrillQueue(window.lastAligned, 'sentence'); runDrill(); };
     $('drillWordBtn').onclick = () => { buildDrillQueue(window.lastAligned, 'word'); runDrill(); };
-    $('drillRecordBtn').onclick = async () => {
-      if (drillAssessing) return;
+    $('drillRecordBtn').onclick = () => {
+      if (drillRecognizer) { requestStopDrillAssessment(); return; }
       const target = drillQueue[drillIndex];
       const region = $('region').value.trim();
       const key = $('key').value.trim();
       if (!target) { setDrillStatus('没有可练习的内容', 'status-error'); return; }
       if (!region || !key) { setDrillStatus('请先填写 Azure Region 和 Key', 'status-error'); return; }
-
-      drillAssessing = true;
-      $('drillRecordBtn').disabled = true;
-      $('drillRecordBtn').textContent = '正在听...';
-      setDrillStatus('录音已开始，请朗读上方内容', 'status-listening');
-      playBeep(880, 120);
-      let heardEnd = false;
-
-      try {
-        const result = await assessOnce(target, key, region, {
-          onSpeechStart: () => setDrillStatus('听到了，请继续读完', 'status-listening'),
-          onSpeechEnd: () => {
-            heardEnd = true;
-            playBeep(440, 120);
-            setDrillStatus('录音结束，正在评分...', 'status-scoring');
-          },
-          onStop: () => {
-            if (!heardEnd) {
-              playBeep(440, 120);
-              setDrillStatus('录音结束，正在评分...', 'status-scoring');
-            }
-          }
-        });
-        const score = result.NBest?.[0]?.PronunciationAssessment?.PronScore;
-        if (score === undefined || Number.isNaN(score)) {
-          setDrillStatus('没有拿到评分，请再读一次', 'status-retry');
-        } else {
-          setDrillStatus(`得分 ${score}；${score >= 80 ? '通过' : '再试一次'}`, score >= 80 ? 'status-pass' : 'status-retry');
-        }
-      } catch (e) {
-        setDrillStatus('评估失败：' + (e.message || e), 'status-error');
-      } finally {
-        drillAssessing = false;
-        $('drillRecordBtn').disabled = false;
-        $('drillRecordBtn').textContent = '我读';
-      }
+      setDrillButton('scoring');
+      setDrillStatus('正在启动麦克风...', 'status-scoring');
+      startDrillAssessment(target, key, region);
     };
     $('playTtsBtn').onclick = () => {
       const target = drillQueue[drillIndex];
@@ -594,8 +639,8 @@
       u.rate = 0.9;
       speechSynthesis.speak(u);
     };
-    $('nextDrillBtn').onclick = () => { drillIndex++; if (drillIndex >= drillQueue.length) drillIndex = 0; runDrill(); };
-    $('backBtn').onclick = () => { $('drill').style.display = 'none'; $('results').style.display = 'block'; };
+    $('nextDrillBtn').onclick = () => { if (drillRecognizer) requestStopDrillAssessment(); drillIndex++; if (drillIndex >= drillQueue.length) drillIndex = 0; runDrill(); };
+    $('backBtn').onclick = () => { if (drillRecognizer) requestStopDrillAssessment(); $('drill').style.display = 'none'; $('results').style.display = 'block'; };
   </script>
 </body>
 </html>
